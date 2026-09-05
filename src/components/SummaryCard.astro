@@ -1,0 +1,141 @@
+---
+// Resumen del mes: saldo de partida + totales calculados.
+import { formatCents, centsToInput } from '../lib/money';
+import type { Totals } from '../lib/types';
+
+interface Props {
+  totals: Totals;
+  startingBalanceCents: number;
+  year: number;
+  month: number;
+}
+const { totals, startingBalanceCents, year, month } = Astro.props;
+const netSign = totals.netCents >= 0 ? 'pos' : 'neg';
+const resultSign = totals.resultCents >= 0 ? 'pos' : 'neg';
+---
+
+<div class="summary">
+  <div class="summary-balance">
+    <label for="starting-balance">Saldo de partida</label>
+    <input
+      id="starting-balance"
+      class="balance-input"
+      type="text"
+      inputmode="decimal"
+      value={centsToInput(startingBalanceCents)}
+      data-cents={startingBalanceCents}
+      data-year={year}
+      data-month={month}
+      placeholder="0,00"
+      aria-label="Saldo de partida"
+    />
+  </div>
+
+  <div class="summary-grid">
+    <div class="summary-cell">
+      <span class="summary-label">Ingresos</span>
+      <span class="summary-value income" id="total-income">{formatCents(totals.incomeCents)}</span>
+    </div>
+    <div class="summary-cell">
+      <span class="summary-label">Gastos</span>
+      <span class="summary-value expense" id="total-expense">{formatCents(totals.expenseCents)}</span>
+    </div>
+    <div class="summary-cell">
+      <span class="summary-label">Resultado neto</span>
+      <span class="summary-value" id="net-value" data-sign={netSign}>{formatCents(totals.netCents)}</span>
+    </div>
+  </div>
+
+  <div class="summary-result">
+    <span class="summary-label">Resultado</span>
+    <span class="summary-value result" id="result-value" data-sign={resultSign}>{formatCents(totals.resultCents)}</span>
+  </div>
+</div>
+
+<style>
+  .summary {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .summary-balance {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .summary-balance label,
+  .summary-label {
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .balance-input {
+    width: 7.5em;
+    text-align: right;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 8px;
+    background: var(--bg);
+    color: var(--ink);
+  }
+
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .summary-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .summary-value {
+    font-size: 17px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .summary-value.income {
+    color: var(--income);
+  }
+
+  .summary-value.expense {
+    color: var(--expense);
+  }
+
+  .summary-result {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 12px;
+    background: var(--brand-soft);
+    border-radius: 10px;
+  }
+
+  .summary-result .summary-value {
+    font-size: 22px;
+  }
+
+  .summary-value[data-sign='pos'] {
+    color: var(--income);
+  }
+
+  .summary-value[data-sign='neg'] {
+    color: var(--danger);
+  }
+</style>

@@ -1,0 +1,57 @@
+/* Variables globales de diseño (paleta: teal profundo + ámbar, tonos medios). */
+:root {
+  --bg: #f6f5f2;
+  --surface: #ffffff;
+  --ink: #1e293b;
+  --muted: #64748b;
+  --border: #e6e3dd;
+  --brand: #0f766e;
+  --brand-strong: #115e59;
+  --brand-soft: #ecf5f4;
+  --income: #15803d;
+  --expense: #c2410c;
+  --savings: #1d4ed8;
+  --danger: #b91c1c;
+  --radius: 14px;
+  --shadow: 0 1px 2px rgba(30, 41, 59, 0.06), 0 4px 12px rgba(30, 41, 59, 0.04);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+input {
+  font: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}

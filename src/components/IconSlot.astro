@@ -1,0 +1,19 @@
+---
+// Hueco reservado para un icono: el usuario pone después su icono/imagen.
+interface Props {
+  size?: number;
+}
+const { size = 20 } = Astro.props;
+---
+
+<span class="icon-slot" style={`width:${size}px;height:${size}px`} aria-hidden="true"></span>
+
+<style>
+  .icon-slot {
+    display: inline-block;
+    flex: none;
+    border: 1.5px dashed var(--border);
+    border-radius: 6px;
+    background: transparent;
+  }
+</style>

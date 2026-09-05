@@ -1,0 +1,121 @@
+---
+// Tarjeta de seguimiento anual: lo que te va quedando mes a mes + cierre del año.
+import { formatCents } from '../lib/money';
+import type { AnnualTracking } from '../lib/types';
+
+interface Props {
+  annual: AnnualTracking;
+}
+const { annual } = Astro.props;
+
+const MONTH_SHORT = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+const yearNet = annual.yearTotal.netCents;
+---
+
+<div class="annual">
+  <h2 class="annual-title">Seguimiento anual</h2>
+
+  <ol class="annual-months">
+    {annual.months.map((p) => (
+      <li class="month" data-sign={p.resultCents >= 0 ? 'pos' : 'neg'}>
+        <span class="month-name">{MONTH_SHORT[p.month - 1]}</span>
+        <span class="month-net" title="Resultado del mes">{formatCents(p.resultCents)}</span>
+      </li>
+    ))}
+  </ol>
+
+  <div class="annual-footer">
+    <span class="annual-label">Total año</span>
+    <span class="annual-total" data-sign={yearNet >= 0 ? 'pos' : 'neg'}>{formatCents(yearNet)}</span>
+  </div>
+</div>
+
+<style>
+  .annual {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .annual-title {
+    font-size: 15px;
+    font-weight: 650;
+  }
+
+  .annual-months {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+
+  .month {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg);
+  }
+
+  .month-name {
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .month-net {
+    font-size: 14px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .month[data-sign='pos'] .month-net {
+    color: var(--income);
+  }
+
+  .month[data-sign='neg'] .month-net {
+    color: var(--danger);
+  }
+
+  .annual-footer {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 12px;
+    background: var(--brand-soft);
+    border-radius: 10px;
+  }
+
+  .annual-label {
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .annual-total {
+    font-size: 22px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .annual-total[data-sign='pos'] {
+    color: var(--income);
+  }
+
+  .annual-total[data-sign='neg'] {
+    color: var(--danger);
+  }
+</style>

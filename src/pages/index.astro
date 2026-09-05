@@ -1,0 +1,356 @@
+---
+// Vista principal: presupuesto del mes seleccionado (mobile-first).
+import Layout from '../layouts/Layout.astro';
+import SummaryCard from '../components/SummaryCard.astro';
+import AnnualCard from '../components/AnnualCard.astro';
+import Section from '../components/Section.astro';
+import IconSlot from '../components/IconSlot.astro';
+import { getBudget } from '../lib/budget';
+
+const MONTH_NAMES = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+];
+
+function shiftMonth(year: number, month: number, delta: number): { year: number; month: number } {
+  const d = new Date(year, month - 1 + delta, 1);
+  return { year: d.getFullYear(), month: d.getMonth() + 1 };
+}
+
+const now = new Date();
+const params = Astro.url.searchParams;
+const year = Number(params.get('year') ?? now.getFullYear());
+const month = Math.min(12, Math.max(1, Number(params.get('month') ?? now.getMonth() + 1)));
+
+const budget = await getBudget(year, month);
+
+const prev = shiftMonth(year, month, -1);
+const next = shiftMonth(year, month, 1);
+const currentYear = now.getFullYear();
+const years = [currentYear - 1, currentYear, currentYear + 1, currentYear + 2, currentYear + 3];
+---
+
+<Layout title="Presupuesto doméstico">
+  <header class="topbar">
+    <div class="brand">
+      <IconSlot size={22} />
+      <h1>Presupuesto</h1>
+    </div>
+
+    <nav class="monthnav" aria-label="Navegación por mes">
+      <a class="nav-arrow" href={`?year=${prev.year}&month=${prev.month}`} aria-label="Mes anterior">‹</a>
+      <span class="month-label">{MONTH_NAMES[month - 1]} {year}</span>
+      <a class="nav-arrow" href={`?year=${next.year}&month=${next.month}`} aria-label="Mes siguiente">›</a>
+    </nav>
+
+    <div class="controls">
+      <select id="year-select" onchange="window.location = this.value" aria-label="Año">
+        {years.map((y) => (
+          <option value={`?year=${y}&month=${month}`} selected={y === year}>
+            {y}
+          </option>
+        ))}
+      </select>
+      <a class="today" href={`?year=${currentYear}&month=${now.getMonth() + 1}`}>Hoy</a>
+      <button id="logout-button" class="logout" type="button">Salir</button>
+    </div>
+  </header>
+
+  <main class="content">
+    <SummaryCard
+      totals={budget.totals}
+      startingBalanceCents={budget.startingBalanceCents}
+      year={year}
+      month={month}
+    />
+
+    <AnnualCard annual={budget.annual} />
+
+    {budget.income.map((group) => (
+      <Section group={group} year={year} month={month} />
+    ))}
+
+    {budget.expenses.map((group) => (
+      <Section group={group} year={year} month={month} />
+    ))}
+  </main>
+
+  <div id="save-status" role="status" aria-live="polite"></div>
+
+  <script>
+    import { actions } from 'astro:actions';
+
+    // Cierra sesión y vuelve al login.
+    document.getElementById('logout-button')?.addEventListener('click', async () => {
+      await actions.logout();
+      window.location.href = '/login';
+    });
+
+    // Formato y parseo es-ES (idéntico al servidor para coherencia visual).
+    const fmt = (c: number) =>
+      new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(c / 100);
+    const parse = (s: string): number | null => {
+      const raw = s.trim();
+      if (raw === '') return null;
+      const n = Number(raw.replace(/\./g, '').replace(',', '.'));
+      return Number.isFinite(n) ? Math.round(n * 100) : null;
+    };
+
+    let statusTimer: ReturnType<typeof setTimeout> | undefined;
+    function flash(msg: string) {
+      const el = document.getElementById('save-status');
+      if (!el) return;
+      el.textContent = msg;
+      el.classList.add('visible');
+      clearTimeout(statusTimer);
+      statusTimer = setTimeout(() => el.classList.remove('visible'), 1600);
+    }
+
+    // Recalcula subtotales y totales a partir del estado actual del DOM.
+    function recompute() {
+      let income = 0;
+      let expense = 0;
+      const subtotals = new Map<string, number>();
+      document.querySelectorAll<HTMLElement>('.amount-input').forEach((el) => {
+        const cents = Number(el.dataset.cents) || 0;
+        const cat = el.closest('.section')?.getAttribute('data-category-id');
+        if (cat) subtotals.set(cat, (subtotals.get(cat) || 0) + cents);
+        if (el.dataset.type === 'income') income += cents;
+        else expense += cents;
+      });
+      subtotals.forEach((sum, cat) => {
+        const el = document.querySelector(`.section-total[data-category-id="${cat}"]`);
+        if (el) el.textContent = fmt(sum);
+      });
+      const balance = Number(document.getElementById('starting-balance')?.getAttribute('data-cents')) || 0;
+      const net = income - expense;
+      const result = balance + net;
+      const set = (id: string, text: string) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = text;
+      };
+      set('total-income', fmt(income));
+      set('total-expense', fmt(expense));
+      set('net-value', fmt(net));
+      const netEl = document.getElementById('net-value');
+      const resEl = document.getElementById('result-value');
+      if (netEl) netEl.dataset.sign = net >= 0 ? 'pos' : 'neg';
+      if (resEl) {
+        resEl.textContent = fmt(result);
+        resEl.dataset.sign = result >= 0 ? 'pos' : 'neg';
+      }
+    }
+
+    // Guarda el importe al perder el foco y actualiza totales en vivo.
+    document.querySelectorAll<HTMLInputElement>('.amount-input').forEach((el) => {
+      el.addEventListener('change', async () => {
+        const nextCents = parse(el.value);
+        const prevCents = Number(el.dataset.cents) || 0;
+        if (nextCents === prevCents || (nextCents === null && prevCents === 0)) return;
+        el.dataset.cents = String(nextCents ?? 0);
+        recompute();
+        try {
+          await actions.setEntry.orThrow({
+            itemId: Number(el.dataset.itemId),
+            year: Number(el.dataset.year),
+            month: Number(el.dataset.month),
+            amount: el.value,
+          });
+          flash('Guardado');
+        } catch {
+          flash('Error al guardar');
+        }
+      });
+    });
+
+    // Guarda el saldo de partida.
+    const balanceInput = document.getElementById('starting-balance') as HTMLInputElement | null;
+    balanceInput?.addEventListener('change', async () => {
+      balanceInput.dataset.cents = String(parse(balanceInput.value) ?? 0);
+      recompute();
+      try {
+        await actions.setStartingBalance.orThrow({
+          year: Number(balanceInput.dataset.year),
+          month: Number(balanceInput.dataset.month),
+          amount: balanceInput.value,
+        });
+        flash('Guardado');
+      } catch {
+        flash('Error al guardar');
+      }
+    });
+
+    // Renombra la partida al salir del campo.
+    document.querySelectorAll<HTMLInputElement>('.item-name').forEach((el) => {
+      const original = el.value;
+      el.addEventListener('change', async () => {
+        const name = el.value.trim();
+        if (!name) {
+          el.value = original;
+          return;
+        }
+        if (name === original) return;
+        try {
+          await actions.renameItem.orThrow({ itemId: Number(el.dataset.itemId), name });
+          flash('Guardado');
+        } catch {
+          el.value = original;
+          flash('Error al guardar');
+        }
+      });
+    });
+
+    // Borra la partida (con confirmación).
+    document.querySelectorAll<HTMLButtonElement>('.item-delete').forEach((el) => {
+      el.addEventListener('click', async () => {
+        if (!confirm('¿Borrar esta partida?')) return;
+        try {
+          await actions.deleteItem.orThrow({ itemId: Number(el.dataset.itemId) });
+          el.closest('.item')?.remove();
+          recompute();
+          flash('Guardado');
+        } catch {
+          flash('Error al guardar');
+        }
+      });
+    });
+
+    // Añade una partida y recarga para renderizarla.
+    document.querySelectorAll<HTMLFormElement>('.add-form').forEach((form) => {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const input = form.querySelector<HTMLInputElement>('.add-input');
+        const name = input?.value.trim() ?? '';
+        if (!name) {
+          input?.focus();
+          return;
+        }
+        try {
+          await actions.addItem.orThrow({ categoryId: Number(form.dataset.categoryId), name });
+          window.location.reload();
+        } catch {
+          flash('Error al guardar');
+        }
+      });
+    });
+  </script>
+</Layout>
+
+<style>
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .brand h1 {
+    font-size: 18px;
+  }
+
+  .monthnav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .nav-arrow {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--brand);
+    text-decoration: none;
+    font-size: 22px;
+    line-height: 1;
+  }
+
+  .nav-arrow:hover {
+    background: var(--brand-soft);
+  }
+
+  .month-label {
+    font-size: 17px;
+    font-weight: 700;
+  }
+
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  #year-select {
+    flex: 1;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    background: var(--bg);
+    color: var(--ink);
+  }
+
+  .today {
+    color: var(--brand);
+    text-decoration: none;
+    font-weight: 600;
+    padding: 8px 4px;
+  }
+
+  .logout {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    background: transparent;
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  .logout:hover {
+    background: #fee2e2;
+    color: var(--danger);
+    border-color: #fecaca;
+  }
+
+  .content {
+    max-width: 560px;
+    margin: 0 auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding-bottom: 72px;
+  }
+
+  #save-status {
+    position: fixed;
+    left: 50%;
+    bottom: 16px;
+    transform: translateX(-50%) translateY(8px);
+    background: var(--ink);
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 999px;
+    font-size: 14px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease, transform 0.18s ease;
+  }
+
+  #save-status.visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+</style>

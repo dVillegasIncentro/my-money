@@ -1,0 +1,172 @@
+---
+// Pantalla de inicio de sesión (privada, mobile-first).
+import Layout from '../layouts/Layout.astro';
+
+// Si ya está en sesión, el middleware redirige antes de llegar aquí.
+---
+
+<Layout title="Iniciar sesión">
+  <main class="login">
+    <div class="login-card">
+      <div class="login-head">
+        <h1>Acceso al presupuesto</h1>
+        <p class="login-sub">Bienvenido a la economía de tu hogar.</p>
+      </div>
+
+      <form id="login-form" class="login-form">
+        <label class="field">
+          <span class="field-label">Contraseña</span>
+          <input
+            type="password"
+            name="password"
+            autocomplete="current-password"
+            placeholder="Tu contraseña"
+            required
+          />
+        </label>
+
+        <label class="remember">
+          <input type="checkbox" name="remember" checked />
+          <span>Recuérdame</span>
+        </label>
+
+        <p id="login-error" class="login-error" role="alert"></p>
+
+        <button class="login-button" type="submit">Entrar</button>
+      </form>
+    </div>
+  </main>
+
+  <script>
+    import { actions } from 'astro:actions';
+
+    const form = document.getElementById('login-form') as HTMLFormElement | null;
+    const error = document.getElementById('login-error') as HTMLElement | null;
+
+    form?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const data = new FormData(form);
+      const password = String(data.get('password') ?? '');
+      const remember = data.get('remember') === 'on';
+
+      const button = form.querySelector<HTMLButtonElement>('.login-button');
+      if (button) button.disabled = true;
+      if (error) error.textContent = '';
+
+      const result = await actions.login({ password, remember });
+      if (result.data?.ok) {
+        window.location.href = '/';
+      } else {
+        if (error) error.textContent = result.data?.error ?? 'Error al iniciar sesión.';
+        if (button) button.disabled = false;
+      }
+    });
+  </script>
+</Layout>
+
+<style>
+  .login {
+    max-width: 420px;
+    margin: 0 auto;
+    min-height: 100dvh;
+    display: flex;
+    align-items: center;
+    padding: 20px;
+  }
+
+  .login-card {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 28px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  .login-head {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .login-head h1 {
+    font-size: 20px;
+  }
+
+  .login-sub {
+    margin: 0;
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  .login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .field-label {
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .field input {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 11px 12px;
+    background: var(--bg);
+    color: var(--ink);
+  }
+
+  .remember {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--ink);
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  .remember input {
+    width: 16px;
+    height: 16px;
+  }
+
+  .login-error {
+    margin: 0;
+    color: var(--danger);
+    font-size: 14px;
+    min-height: 1.2em;
+  }
+
+  .login-button {
+    border: none;
+    border-radius: 8px;
+    padding: 12px;
+    background: var(--brand);
+    color: #fff;
+    font-weight: 600;
+    font-size: 16px;
+  }
+
+  .login-button:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+
+  .login-button:not(:disabled):hover {
+    background: var(--brand-strong);
+  }
+</style>
