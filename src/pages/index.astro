@@ -52,7 +52,9 @@ const years = [currentYear - 1, currentYear, currentYear + 1, currentYear + 2, c
         ))}
       </select>
       <a class="today" href={`?year=${currentYear}&month=${now.getMonth() + 1}`}>Hoy</a>
-      <button id="logout-button" class="logout" type="button">Salir</button>
+      <form method="POST" action="/logout" class="logout-form">
+        <button class="logout" type="submit">Salir</button>
+      </form>
     </div>
   </header>
 
@@ -79,12 +81,6 @@ const years = [currentYear - 1, currentYear, currentYear + 1, currentYear + 2, c
 
   <script>
     import { actions } from 'astro:actions';
-
-    // Cierra sesión y vuelve al login.
-    document.getElementById('logout-button')?.addEventListener('click', async () => {
-      await actions.logout();
-      window.location.href = '/login';
-    });
 
     // Formato y parseo es-ES (idéntico al servidor para coherencia visual).
     const fmt = (c: number) =>
@@ -307,6 +303,11 @@ const years = [currentYear - 1, currentYear, currentYear + 1, currentYear + 2, c
     text-decoration: none;
     font-weight: 600;
     padding: 8px 4px;
+  }
+
+  .logout-form {
+    margin: 0;
+    display: inline-flex;
   }
 
   .logout {

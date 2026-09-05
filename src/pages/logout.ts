@@ -1,0 +1,8 @@
+// Cierra la sesión y redirige al login (POST nativo, sin JS).
+import type { APIContext } from 'astro';
+import { auth } from '../lib/auth';
+
+export async function POST(context: APIContext): Promise<Response> {
+  context.cookies.delete(auth.SESSION_COOKIE, { path: '/' });
+  return context.redirect('/login', 302);
+}

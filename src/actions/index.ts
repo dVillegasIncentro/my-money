@@ -3,7 +3,6 @@ import { defineAction } from 'astro:actions';
 import { z } from 'astro/zod';
 import { parseEuroToCents } from '../lib/money';
 import { addItem, deleteItem, renameItem, setEntry, setStartingBalance } from '../lib/budget';
-import { auth, createSessionCookie, verifyPassword } from '../lib/auth';
 
 const nonEmptyName = z.string().trim().min(1, 'El nombre no puede estar vacío').max(100);
 const yearMonth = {
@@ -55,35 +54,6 @@ export const server = {
     handler: async ({ itemId }) => {
       await deleteItem(itemId);
       return { ok: true };
-    },
-  }),
-
-  // Inicia sesión: verifica la contraseña y firma la cookie de sesión.
-  login: defineAction({
-    input: z.object({ password: z.string().min(1).max(200), remember: z.boolean() }),
-    handler: async ({ password, remember }, context) => {
-      const env = import.meta.env as { MM_PASSWORD_HASH?: string };
-      if (!env.MM_PASSWORD_HASH) return { ok: false as const, error: 'Setup incompleto: define MM_PASSWORD_HASH.' };
-      if (!verifyPassword(password, env.MM_PASSWORD_HASH)) {
-        return { ok: false as const, error: 'Contraseña incorrecta.' };
-      }
-      const cookie = createSessionCookie(env);
-      context.cookies.set(auth.SESSION_COOKIE, cookie, {
-        httpOnly: true,
-        sameSite: 'lax',
-        secure: import.meta.env.PROD,
-        path: '/',
-        maxAge: remember ? auth.SESSION_DURATION : undefined,
-      });
-      return { ok: true as const };
-    },
-  }),
-
-  // Cierra la sesión: borra la cookie firmada.
-  logout: defineAction({
-    handler: async (_input, context) => {
-      context.cookies.delete(auth.SESSION_COOKIE, { path: '/' });
-      return { ok: true as const };
     },
   }),
 };

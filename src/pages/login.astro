@@ -1,8 +1,12 @@
 ---
-// Pantalla de inicio de sesión (privada, mobile-first).
+// Pantalla de inicio de sesión (privada, mobile-first, SSR sin JS).
 import Layout from '../layouts/Layout.astro';
 
-// Si ya está en sesión, el middleware redirige antes de llegar aquí.
+const errorCode = Astro.url.searchParams.get('error');
+const errorMessage =
+  errorCode === 'bad' ? 'Contraseña incorrecta.' :
+  errorCode === 'setup' ? 'Configuración incompleta.' :
+  '';
 ---
 
 <Layout title="Iniciar sesión">
@@ -13,7 +17,7 @@ import Layout from '../layouts/Layout.astro';
         <p class="login-sub">Bienvenido a la economía de tu hogar.</p>
       </div>
 
-      <form id="login-form" class="login-form">
+      <form method="POST" action="/api/login" class="login-form">
         <label class="field">
           <span class="field-label">Contraseña</span>
           <input
@@ -26,42 +30,16 @@ import Layout from '../layouts/Layout.astro';
         </label>
 
         <label class="remember">
-          <input type="checkbox" name="remember" checked />
+          <input type="checkbox" name="remember" />
           <span>Recuérdame</span>
         </label>
 
-        <p id="login-error" class="login-error" role="alert"></p>
+        {errorMessage && <p class="login-error" role="alert">{errorMessage}</p>}
 
         <button class="login-button" type="submit">Entrar</button>
       </form>
     </div>
   </main>
-
-  <script>
-    import { actions } from 'astro:actions';
-
-    const form = document.getElementById('login-form') as HTMLFormElement | null;
-    const error = document.getElementById('login-error') as HTMLElement | null;
-
-    form?.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const data = new FormData(form);
-      const password = String(data.get('password') ?? '');
-      const remember = data.get('remember') === 'on';
-
-      const button = form.querySelector<HTMLButtonElement>('.login-button');
-      if (button) button.disabled = true;
-      if (error) error.textContent = '';
-
-      const result = await actions.login({ password, remember });
-      if (result.data?.ok) {
-        window.location.href = '/';
-      } else {
-        if (error) error.textContent = result.data?.error ?? 'Error al iniciar sesión.';
-        if (button) button.disabled = false;
-      }
-    });
-  </script>
 </Layout>
 
 <style>
@@ -148,7 +126,6 @@ import Layout from '../layouts/Layout.astro';
     margin: 0;
     color: var(--danger);
     font-size: 14px;
-    min-height: 1.2em;
   }
 
   .login-button {
@@ -161,12 +138,7 @@ import Layout from '../layouts/Layout.astro';
     font-size: 16px;
   }
 
-  .login-button:disabled {
-    opacity: 0.6;
-    cursor: default;
-  }
-
-  .login-button:not(:disabled):hover {
+  .login-button:hover {
     background: var(--brand-strong);
   }
 </style>
