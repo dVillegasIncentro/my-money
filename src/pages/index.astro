@@ -79,6 +79,21 @@ const years = [currentYear - 1, currentYear, currentYear + 1, currentYear + 2, c
 
   <div id="save-status" role="status" aria-live="polite"></div>
 
+  <div id="amount-overlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+    <div class="overlay-card">
+      <p id="confirm-title" class="overlay-title">Ya hay una cantidad</p>
+      <p class="overlay-hint">
+        Actual: <strong id="confirm-current"></strong> · Nuevo: <strong id="confirm-new"></strong>
+      </p>
+      <div class="overlay-actions">
+        <button id="confirm-replace" class="overlay-btn replace" type="button">Reemplazar</button>
+        <button id="confirm-add" class="overlay-btn add" type="button">Sumar</button>
+        <button id="confirm-sub" class="overlay-btn sub" type="button">Restar</button>
+        <button id="confirm-cancel" class="overlay-btn cancel" type="button">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     import { actions } from 'astro:actions';
 
@@ -137,24 +152,64 @@ const years = [currentYear - 1, currentYear, currentYear + 1, currentYear + 2, c
       }
     }
 
-    // Guarda el importe al perder el foco y actualiza totales en vivo.
+    // Guarda el importe de una partida (final persistido en céntimos).
+    async function saveAmount(el: HTMLInputElement, cents: number) {
+      el.dataset.cents = String(cents);
+      el.value = Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(cents / 100);
+      recompute();
+      try {
+        await actions.setEntry.orThrow({
+          itemId: Number(el.dataset.itemId),
+          year: Number(el.dataset.year),
+          month: Number(el.dataset.month),
+          amount: el.value,
+        });
+        flash('Guardado');
+      } catch {
+        flash('Error al guardar');
+      }
+    }
+
+    // Muestra el diálogo de confirmación (reemplazar/sumar/restar) sobre un importe ya existente.
+    function confirmAmount(el: HTMLInputElement, prevCents: number, nextCents: number) {
+      const overlay = document.getElementById('amount-overlay')!;
+      const currentEl = document.getElementById('confirm-current')!;
+      const newEl = document.getElementById('confirm-new')!;
+      const replaceBtn = document.getElementById('confirm-replace')!;
+      const addBtn = document.getElementById('confirm-add')!;
+      const subBtn = document.getElementById('confirm-sub')!;
+
+      currentEl.textContent = fmt(prevCents);
+      newEl.textContent = fmt(nextCents);
+      replaceBtn.textContent = 'Reemplazar: ' + fmt(nextCents);
+      addBtn.textContent = 'Sumar: ' + fmt(prevCents + nextCents);
+      subBtn.textContent = 'Restar: ' + fmt(prevCents - nextCents);
+
+      const close = () => overlay.classList.remove('open');
+      const commit = (result: number) => {
+        close();
+        void saveAmount(el, result);
+      };
+
+      replaceBtn.onclick = () => commit(nextCents);
+      addBtn.onclick = () => commit(prevCents + nextCents);
+      subBtn.onclick = () => commit(prevCents - nextCents);
+      (document.getElementById('confirm-cancel') as HTMLButtonElement).onclick = close;
+      overlay.classList.add('open');
+    }
+
+    // Guarda el importe al perder el foco; pregunta solo si ya había cantidad.
     document.querySelectorAll<HTMLInputElement>('.amount-input').forEach((el) => {
-      el.addEventListener('change', async () => {
+      el.addEventListener('change', () => {
         const nextCents = parse(el.value);
         const prevCents = Number(el.dataset.cents) || 0;
         if (nextCents === prevCents || (nextCents === null && prevCents === 0)) return;
-        el.dataset.cents = String(nextCents ?? 0);
-        recompute();
-        try {
-          await actions.setEntry.orThrow({
-            itemId: Number(el.dataset.itemId),
-            year: Number(el.dataset.year),
-            month: Number(el.dataset.month),
-            amount: el.value,
-          });
-          flash('Guardado');
-        } catch {
-          flash('Error al guardar');
+        if (prevCents > 0) {
+          confirmAmount(el, prevCents, nextCents ?? 0);
+        } else {
+          el.dataset.cents = String(nextCents ?? 0);
+          recompute();
+          void saveAmount(el, nextCents ?? 0);
         }
       });
     });
@@ -353,5 +408,80 @@ const years = [currentYear - 1, currentYear, currentYear + 1, currentYear + 2, c
   #save-status.visible {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
+  }
+
+  .overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(15, 23, 42, 0.45);
+  }
+
+  .overlay.open {
+    display: flex;
+  }
+
+  .overlay-card {
+    width: 100%;
+    max-width: 340px;
+    background: var(--surface);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .overlay-title {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 700;
+  }
+
+  .overlay-hint {
+    margin: 0;
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  .overlay-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .overlay-btn {
+    border: none;
+    border-radius: 9px;
+    padding: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    text-align: left;
+  }
+
+  .overlay-btn.replace {
+    background: var(--brand);
+    color: #fff;
+  }
+
+  .overlay-btn.add {
+    background: var(--income);
+    color: #fff;
+  }
+
+  .overlay-btn.sub {
+    background: var(--expense);
+    color: #fff;
+  }
+
+  .overlay-btn.cancel {
+    background: var(--bg);
+    color: var(--muted);
+    border: 1px solid var(--border);
   }
 </style>
